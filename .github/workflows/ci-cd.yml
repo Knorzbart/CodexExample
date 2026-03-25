@@ -50,4 +50,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Deploy to k3s
-        run: ./scripts/deploy-k8s.sh
+        run: bash ./scripts/deploy-k8s.sh
