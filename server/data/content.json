@@ -1,0 +1,19 @@
+{
+  "lines": [
+    {
+      "id": "welcome-1",
+      "text": "A calm little homepage that can be edited while visitors are still watching.",
+      "createdAt": "2026-03-25T08:00:00.000Z"
+    },
+    {
+      "id": "welcome-2",
+      "text": "Sign in on the right, add a line in the CMS, and every open tab updates automatically.",
+      "createdAt": "2026-03-25T08:01:00.000Z"
+    },
+    {
+      "id": "welcome-3",
+      "text": "This example stores its content on the server so your changes survive a restart.",
+      "createdAt": "2026-03-25T08:02:00.000Z"
+    }
+  ]
+}

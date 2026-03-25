@@ -1,0 +1,21 @@
+{
+  "name": "live-cms-example",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "node --watch server/index.js",
+    "dev:client": "npm --prefix client run dev -- --host",
+    "build": "npm --prefix client run build",
+    "lint": "npm --prefix client run lint",
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-session": "^1.18.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

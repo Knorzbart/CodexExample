@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap');
+
+:root {
+  --page-bg: #efe4d2;
+  --page-ink: #241c15;
+  --muted-strong: #5f5141;
+  --accent-strong: #b55d30;
+  --font-body: 'Space Grotesk', sans-serif;
+  --font-display: 'Fraunces', serif;
+  color: var(--page-ink);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 30%),
+    linear-gradient(180deg, #f7efe5 0%, #ecdec7 100%);
+  font-family: var(--font-body);
+  font-synthesis: none;
+  line-height: 1.5;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+body,
+button,
+input,
+textarea {
+  font-family: var(--font-body);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  color: inherit;
+  line-height: 1.02;
+}
+
+h1 {
+  font-size: clamp(3rem, 6vw, 5.6rem);
+}
+
+h2 {
+  font-size: clamp(1.8rem, 3vw, 2.3rem);
+}
+
+h3 {
+  font-size: 1.2rem;
+}
+
+a {
+  color: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
