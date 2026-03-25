@@ -19,8 +19,8 @@
 .story-panel {
   padding: 48px;
   background:
-    radial-gradient(circle at top right, rgba(188, 119, 74, 0.28), transparent 34%),
-    linear-gradient(160deg, rgba(251, 244, 234, 0.95), rgba(244, 233, 216, 0.92));
+    radial-gradient(circle at top right, var(--story-glow), transparent 34%),
+    linear-gradient(160deg, var(--page-background-start), var(--page-background-end));
 }
 
 .story-panel::after {
@@ -36,8 +36,8 @@
 
 .side-panel {
   padding: 32px;
-  background: rgba(27, 29, 28, 0.93);
-  color: #f5efe5;
+  background: color-mix(in srgb, var(--panel-background) 93%, transparent);
+  color: var(--panel-foreground);
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -57,7 +57,22 @@
   text-transform: uppercase;
   letter-spacing: 0.26em;
   font-size: 0.77rem;
-  color: var(--accent-strong);
+  color: var(--theme-accent);
+}
+
+.story-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.live-pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--muted-strong);
+  font-size: 0.85rem;
 }
 
 .story-panel h1 {
@@ -104,7 +119,7 @@
 
 .line-index {
   font-size: 0.9rem;
-  color: var(--accent-strong);
+  color: var(--theme-accent);
   font-weight: 700;
 }
 
@@ -135,6 +150,7 @@
 }
 
 .login-form input,
+.editor-form input,
 .editor-form textarea {
   width: 100%;
   border: 1px solid rgba(245, 239, 229, 0.18);
@@ -146,6 +162,7 @@
 }
 
 .login-form input:focus,
+.editor-form input:focus,
 .editor-form textarea:focus {
   outline: 2px solid rgba(221, 137, 81, 0.75);
   outline-offset: 2px;
@@ -179,7 +196,7 @@
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #df8b4b, #c55f32);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 72%, white), var(--theme-accent));
   color: #fff8f2;
   font-weight: 700;
 }
@@ -235,6 +252,41 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.theme-grid label {
+  display: grid;
+  gap: 8px;
+  font-size: 0.92rem;
+  color: rgba(245, 239, 229, 0.84);
+}
+
+.change-log {
+  display: grid;
+  gap: 12px;
+}
+
+.change-item {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.change-item strong {
+  font-size: 0.96rem;
+}
+
+.change-item span {
+  color: rgba(245, 239, 229, 0.68);
+  font-size: 0.85rem;
+}
+
 .admin-shell {
   grid-template-columns: minmax(0, 1.1fr) minmax(340px, 520px);
 }
@@ -260,6 +312,12 @@ code {
 
   .story-panel h1 {
     max-width: 100%;
+  }
+
+  .story-header,
+  .theme-grid {
+    grid-template-columns: 1fr;
+    display: grid;
   }
 
   .cms-item,

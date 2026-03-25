@@ -1,0 +1,53 @@
+name: CI CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install server dependencies
+        run: npm ci
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Docker build
+        run: docker build -t codexexample:ci .
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - codexexample
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to k3s
+        run: ./scripts/deploy-k8s.sh

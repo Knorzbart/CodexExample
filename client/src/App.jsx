@@ -1,5 +1,11 @@
 import { startTransition, useEffect, useState } from 'react'
 import './App.css'
+import {
+  buildThemeStyle,
+  defaultSiteConfig,
+  defaultSiteState,
+  normalizeSiteState,
+} from './siteState.js'
 
 const emptyCredentials = {
   username: '',
@@ -8,13 +14,15 @@ const emptyCredentials = {
 
 function App() {
   const [pathname, setPathname] = useState(() => window.location.pathname)
-  const [lines, setLines] = useState([])
+  const [siteState, setSiteState] = useState(defaultSiteState)
   const [credentials, setCredentials] = useState(emptyCredentials)
   const [draft, setDraft] = useState('')
+  const [siteConfigDraft, setSiteConfigDraft] = useState(defaultSiteConfig)
   const [session, setSession] = useState({
     authenticated: false,
     username: '',
   })
+  const [liveState, setLiveState] = useState('Connecting live sync...')
   const [loginState, setLoginState] = useState({
     loading: false,
     error: '',
@@ -24,7 +32,7 @@ function App() {
     error: '',
     notice: '',
   })
-  const [contentState, setContentState] = useState({
+  const [siteStateMeta, setSiteStateMeta] = useState({
     loading: true,
     error: '',
   })
@@ -35,44 +43,46 @@ function App() {
     const syncPath = () => setPathname(window.location.pathname)
 
     window.addEventListener('popstate', syncPath)
-
     return () => {
       window.removeEventListener('popstate', syncPath)
     }
   }, [])
 
   useEffect(() => {
+    setSiteConfigDraft(siteState.siteConfig)
+  }, [siteState.siteConfig])
+
+  useEffect(() => {
     let ignore = false
 
-    const loadContent = async ({ showLoading = false } = {}) => {
+    const loadSiteState = async ({ showLoading = false } = {}) => {
       if (showLoading) {
-        setContentState((current) => ({
-          ...current,
+        setSiteStateMeta({
           loading: true,
           error: '',
-        }))
+        })
       }
 
       try {
-        const response = await fetch('/api/content')
+        const response = await fetch('/api/site-state')
         const payload = await response.json()
 
         if (!response.ok) {
-          throw new Error(payload.error ?? 'The homepage content could not be loaded.')
+          throw new Error(payload.error ?? 'The homepage state could not be loaded.')
         }
 
         if (!ignore) {
           startTransition(() => {
-            setLines(payload.lines ?? [])
+            setSiteState(normalizeSiteState(payload))
           })
-          setContentState({
+          setSiteStateMeta({
             loading: false,
             error: '',
           })
         }
       } catch (error) {
         if (!ignore) {
-          setContentState({
+          setSiteStateMeta({
             loading: false,
             error: error.message,
           })
@@ -102,19 +112,49 @@ function App() {
       }
     }
 
-    loadContent({ showLoading: true })
+    const interval = window.setInterval(() => {
+      loadSiteState()
+    }, 15000)
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadSiteState()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    loadSiteState({ showLoading: true })
     loadSession()
 
     const stream = new EventSource('/api/stream')
-    stream.addEventListener('content-updated', () => {
-      loadContent()
+
+    stream.onopen = () => {
+      setLiveState('Live sync connected')
+    }
+
+    stream.addEventListener('site-updated', () => {
+      setLiveState('Live sync connected')
+      loadSiteState()
     })
+
+    stream.onerror = () => {
+      setLiveState('Live sync reconnecting...')
+      loadSiteState()
+    }
 
     return () => {
       ignore = true
       stream.close()
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [])
+
+  const applySiteState = (payload) => {
+    startTransition(() => {
+      setSiteState(normalizeSiteState(payload))
+    })
+  }
 
   const navigate = (nextPath) => {
     if (window.location.pathname === nextPath) {
@@ -128,6 +168,27 @@ function App() {
   const handleCredentialChange = (event) => {
     const { name, value } = event.target
     setCredentials((current) => ({
+      ...current,
+      [name]: value,
+    }))
+  }
+
+  const handleSiteConfigChange = (event) => {
+    const { name, value } = event.target
+
+    if (name.startsWith('theme.')) {
+      const themeKey = name.replace('theme.', '')
+      setSiteConfigDraft((current) => ({
+        ...current,
+        theme: {
+          ...current.theme,
+          [themeKey]: value,
+        },
+      }))
+      return
+    }
+
+    setSiteConfigDraft((current) => ({
       ...current,
       [name]: value,
     }))
@@ -219,14 +280,12 @@ function App() {
         throw new Error(payload.error ?? 'The text line could not be saved.')
       }
 
-      startTransition(() => {
-        setLines(payload.lines ?? [])
-      })
+      applySiteState(payload)
       setDraft('')
       setCmsState({
         loading: false,
         error: '',
-        notice: 'The main page was updated live.',
+        notice: 'The site content was updated and broadcast to all tabs.',
       })
     } catch (error) {
       setCmsState({
@@ -254,9 +313,7 @@ function App() {
         throw new Error(payload.error ?? 'The text line could not be removed.')
       }
 
-      startTransition(() => {
-        setLines(payload.lines ?? [])
-      })
+      applySiteState(payload)
       setCmsState({
         loading: false,
         error: '',
@@ -271,16 +328,53 @@ function App() {
     }
   }
 
+  const handleSaveLook = async (event) => {
+    event.preventDefault()
+    setCmsState({
+      loading: true,
+      error: '',
+      notice: '',
+    })
+
+    try {
+      const response = await fetch('/api/site-config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(siteConfigDraft),
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? 'The site look could not be updated.')
+      }
+
+      applySiteState(payload)
+      setCmsState({
+        loading: false,
+        error: '',
+        notice: 'The homepage copy and visual style were updated.',
+      })
+    } catch (error) {
+      setCmsState({
+        loading: false,
+        error: error.message,
+        notice: '',
+      })
+    }
+  }
+
   const renderLines = () => {
-    if (contentState.loading) {
-      return <p className="status-copy">Loading the live text board…</p>
+    if (siteStateMeta.loading) {
+      return <p className="status-copy">Loading the live text board...</p>
     }
 
-    if (contentState.error) {
-      return <p className="status-copy error-copy">{contentState.error}</p>
+    if (siteStateMeta.error) {
+      return <p className="status-copy error-copy">{siteStateMeta.error}</p>
     }
 
-    if (lines.length === 0) {
+    if (siteState.lines.length === 0) {
       return (
         <p className="status-copy">
           No text has been published yet. Add the first line in the CMS.
@@ -290,7 +384,7 @@ function App() {
 
     return (
       <div className="line-stack">
-        {lines.map((line, index) => (
+        {siteState.lines.map((line, index) => (
           <article className="line-card" key={line.id}>
             <span className="line-index">{String(index + 1).padStart(2, '0')}</span>
             <p>{line.text}</p>
@@ -300,15 +394,34 @@ function App() {
     )
   }
 
+  const renderChangeLog = () => {
+    if (siteState.changes.length === 0) {
+      return <p className="support-copy">No site changes have been recorded yet.</p>
+    }
+
+    return (
+      <div className="change-log">
+        {siteState.changes.map((change) => (
+          <article className="change-item" key={change.id}>
+            <strong>{change.summary}</strong>
+            <span>{new Date(change.createdAt).toLocaleString()}</span>
+          </article>
+        ))}
+      </div>
+    )
+  }
+
+  const themeStyle = buildThemeStyle(siteState.siteConfig)
+
   return (
-    <main className={`app-shell ${isAdminRoute ? 'admin-shell' : ''}`}>
+    <main className={`app-shell ${isAdminRoute ? 'admin-shell' : ''}`} style={themeStyle}>
       <section className="panel story-panel">
-        <p className="eyebrow">Live website copy</p>
-        <h1>Publish small text updates and watch every open tab keep up.</h1>
-        <p className="lede">
-          The left side is your public homepage. The right side is your access point
-          into a lightweight admin area with live updates.
-        </p>
+        <div className="story-header">
+          <p className="eyebrow">{siteState.siteConfig.heroEyebrow}</p>
+          <span className="live-pill">{liveState}</span>
+        </div>
+        <h1>{siteState.siteConfig.heroTitle}</h1>
+        <p className="lede">{siteState.siteConfig.heroDescription}</p>
         {renderLines()}
       </section>
 
@@ -325,10 +438,7 @@ function App() {
             <>
               <div className="welcome-block">
                 <h2>Signed in as {session.username}</h2>
-                <p>
-                  Add a line below and every connected homepage will refresh
-                  automatically.
-                </p>
+                <p>MongoDB stores the published text, the look of the page, and the recent change history.</p>
               </div>
 
               <form className="editor-form" onSubmit={handleAddLine}>
@@ -345,12 +455,114 @@ function App() {
                 />
                 <div className="form-actions">
                   <button className="primary-button" type="submit" disabled={cmsState.loading}>
-                    {cmsState.loading ? 'Saving…' : 'Add line'}
+                    {cmsState.loading ? 'Saving...' : 'Add line'}
                   </button>
                   <button className="ghost-button" type="button" onClick={handleLogout}>
                     Logout
                   </button>
                 </div>
+              </form>
+
+              <form className="editor-form" onSubmit={handleSaveLook}>
+                <div className="cms-list-heading">
+                  <h3>Homepage look and copy</h3>
+                  <span>Stored in MongoDB</span>
+                </div>
+                <label htmlFor="heroEyebrow">Eyebrow</label>
+                <input
+                  id="heroEyebrow"
+                  name="heroEyebrow"
+                  type="text"
+                  value={siteConfigDraft.heroEyebrow}
+                  onChange={handleSiteConfigChange}
+                  required
+                />
+                <label htmlFor="heroTitle">Headline</label>
+                <textarea
+                  id="heroTitle"
+                  name="heroTitle"
+                  rows="3"
+                  value={siteConfigDraft.heroTitle}
+                  onChange={handleSiteConfigChange}
+                  required
+                />
+                <label htmlFor="heroDescription">Description</label>
+                <textarea
+                  id="heroDescription"
+                  name="heroDescription"
+                  rows="4"
+                  value={siteConfigDraft.heroDescription}
+                  onChange={handleSiteConfigChange}
+                  required
+                />
+                <div className="theme-grid">
+                  <label>
+                    Accent
+                    <input
+                      name="theme.accent"
+                      type="text"
+                      value={siteConfigDraft.theme.accent}
+                      onChange={handleSiteConfigChange}
+                    />
+                  </label>
+                  <label>
+                    Page start
+                    <input
+                      name="theme.pageBackgroundStart"
+                      type="text"
+                      value={siteConfigDraft.theme.pageBackgroundStart}
+                      onChange={handleSiteConfigChange}
+                    />
+                  </label>
+                  <label>
+                    Page end
+                    <input
+                      name="theme.pageBackgroundEnd"
+                      type="text"
+                      value={siteConfigDraft.theme.pageBackgroundEnd}
+                      onChange={handleSiteConfigChange}
+                    />
+                  </label>
+                  <label>
+                    Story glow
+                    <input
+                      name="theme.storyGlow"
+                      type="text"
+                      value={siteConfigDraft.theme.storyGlow}
+                      onChange={handleSiteConfigChange}
+                    />
+                  </label>
+                  <label>
+                    Panel background
+                    <input
+                      name="theme.panelBackground"
+                      type="text"
+                      value={siteConfigDraft.theme.panelBackground}
+                      onChange={handleSiteConfigChange}
+                    />
+                  </label>
+                  <label>
+                    Panel foreground
+                    <input
+                      name="theme.panelForeground"
+                      type="text"
+                      value={siteConfigDraft.theme.panelForeground}
+                      onChange={handleSiteConfigChange}
+                    />
+                  </label>
+                  <label>
+                    Card background
+                    <input
+                      name="theme.cardBackground"
+                      type="text"
+                      value={siteConfigDraft.theme.cardBackground}
+                      onChange={handleSiteConfigChange}
+                    />
+                  </label>
+                </div>
+                <button className="primary-button" type="submit" disabled={cmsState.loading}>
+                  {cmsState.loading ? 'Updating...' : 'Save look'}
+                </button>
               </form>
 
               {cmsState.error ? <p className="feedback error-copy">{cmsState.error}</p> : null}
@@ -359,9 +571,9 @@ function App() {
               <div className="cms-list">
                 <div className="cms-list-heading">
                   <h3>Published lines</h3>
-                  <span>{lines.length} total</span>
+                  <span>{siteState.lines.length} total</span>
                 </div>
-                {lines.map((line) => (
+                {siteState.lines.map((line) => (
                   <article className="cms-item" key={line.id}>
                     <p>{line.text}</p>
                     <button
@@ -374,6 +586,14 @@ function App() {
                     </button>
                   </article>
                 ))}
+              </div>
+
+              <div className="cms-list">
+                <div className="cms-list-heading">
+                  <h3>Recent site changes</h3>
+                  <span>{siteState.changes.length} tracked</span>
+                </div>
+                {renderChangeLog()}
               </div>
             </>
           ) : (
@@ -403,8 +623,8 @@ function App() {
             <div className="welcome-block">
               <h2>Welcome back, {session.username}</h2>
               <p>
-                You are already authenticated. Open the CMS to publish a new line to the
-                homepage.
+                You are already authenticated. Open the CMS to publish content and adjust
+                the live visual theme.
               </p>
               <button className="primary-button" type="button" onClick={() => navigate('/admin')}>
                 Open CMS
@@ -440,7 +660,7 @@ function App() {
               />
 
               <button className="primary-button" type="submit" disabled={loginState.loading}>
-                {loginState.loading ? 'Signing in…' : 'Login'}
+                {loginState.loading ? 'Signing in...' : 'Login'}
               </button>
 
               <p className="hint-copy">
